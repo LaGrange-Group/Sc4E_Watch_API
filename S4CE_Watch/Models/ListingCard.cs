@@ -8,12 +8,13 @@ namespace S4CE_Watch.Models
 
     public class AllListings
     {
-        public List<ListingCard> reverb { get; set; }
+        public List<ListingCard> listings { get; set; }
 
     }
+
     public class ListingCard
     {
-        public int id { get; set; }
+        public string id { get; set; }
         public string make { get; set; }
         public string model { get; set; }
         public string finish { get; set; }
