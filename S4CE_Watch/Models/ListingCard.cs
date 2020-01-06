@@ -28,5 +28,6 @@ namespace S4CE_Watch.Models
         public string state { get; set; }
         public List<string> photos { get; set; }
         public string listingLink { get; set; }
+        public string resourcePhoto { get; set; }
     }
 }

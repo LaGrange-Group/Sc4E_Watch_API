@@ -20,13 +20,51 @@ namespace S4CE_Watch.Controllers
         {
             manager = new HttpClientManager();
         }
+
         [HttpGet]
-        [Route("reverb")]
-        public async Task<AllListings> Reverb()
+        [Route("all")]
+        public async Task<IActionResult> All()
+        {
+            List<ListingCard> reverbListings = new List<ListingCard>();
+            List<ListingCard> ebayListings = new List<ListingCard>();
+            AllListings allListings = new AllListings();
+            try
+            {
+                reverbListings = Reverb();
+            }
+            catch(Exception e)
+            {
+
+            }
+            try
+            {
+                var task = Ebay();
+                task.Wait();
+                ebayListings = task.Result;
+            }
+            catch (Exception e)
+            {
+
+            }
+            
+            if (reverbListings != null && reverbListings.Count > 0)
+            {
+                allListings.listings = reverbListings;
+            }
+            if (ebayListings != null && ebayListings.Count > 0)
+            {
+                foreach(ListingCard listing in ebayListings)
+                {
+                    allListings.listings.Add(listing);
+                }
+            }
+            return Ok(allListings);
+        }
+
+        private List<ListingCard> Reverb()
         {
             List<ListingCard> listingCards = new List<ListingCard>();
-            ReverbQueryListings reverbListings = await manager.GetReverb("https://api.reverb.com/api/listings?query=guild s4ce");
-            List<Listing1> liveListings = reverbListings.listings.Where(l => l.state.description == "Live").ToList();
+            List<Listing1> liveListings = manager.GetReverb("https://api.reverb.com/api/listings?query=guild s4ce");
             foreach (Listing1 listing in liveListings)
             {
                 listingCards.Add(new ListingCard()
@@ -44,15 +82,15 @@ namespace S4CE_Watch.Controllers
                     published_at = listing.published_at,
                     state = listing.state.description,
                     photos = listing.photos.Select(p => p._links.large_crop.href).ToList(),
-                    listingLink = "https://reverb.com/item/" + listing.id.ToString()
+                    listingLink = "https://reverb.com/item/" + listing.id.ToString(),
+                    resourcePhoto = "reverb.png"
                 });
             }
-            return new AllListings() { listings = listingCards };
+            return listingCards;
         }
 
-        [HttpGet]
-        [Route("ebay")]
-        public async Task<AllListings> Ebay()
+  
+        private async Task<List<ListingCard>> Ebay()
         {
             List<ListingCard> listingCards = new List<ListingCard>();
             List<EbayItem> listings = await manager.GetEbay();
@@ -63,23 +101,24 @@ namespace S4CE_Watch.Controllers
                     listingCards.Add(new ListingCard()
                     {
                         id = item.ItemID,
-                        make = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Brand").SingleOrDefault()?.Value?[0] ?? "?Guild",
-                        model = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model").SingleOrDefault()?.Value?[0] ?? "?Songbird",
-                        finish = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Body Material").SingleOrDefault()?.Value?[0] ?? "?Natural",
-                        year = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model Year").SingleOrDefault()?.Value?[0] ?? "???",
+                        make = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Brand").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
+                        model = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
+                        finish = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Body Material").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
+                        year = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model Year").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
                         title = item.Title,
                         created_at = DateTime.Now,
                         description = item.Description,
                         condition = item.ConditionDisplayName,
-                        price = item.ConvertedCurrentPrice.Value.ToString() ?? "???",
+                        price = item.ConvertedCurrentPrice.Value.ToString() ?? "UNKOWN",
                         published_at = DateTime.Now,
                         state = "Live",
                         photos = item.PictureURL.ToList(),
-                        listingLink = item.ViewItemURLForNaturalSearch
+                        listingLink = item.ViewItemURLForNaturalSearch,
+                        resourcePhoto = "ebay.png"
                     }); ;
                 }
             }
-            return new AllListings() { listings = listingCards };
+            return listingCards;
         }
 
     }
