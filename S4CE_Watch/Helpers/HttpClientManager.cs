@@ -1,4 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Amazon;
+using Amazon.Lambda;
+using Amazon.Lambda.Model;
+using Amazon.Runtime;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using S4CE_Watch.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +18,7 @@ namespace S4CE_Watch.Helpers
 {
     public class HttpClientManager
     {
+
         public List<Listing1> GetReverb(string url)
         {
             List<string> searchKeys = new List<string>() { "guild s4ce", "guild songbird" };
@@ -23,13 +30,13 @@ namespace S4CE_Watch.Helpers
                 httpWebRequest.Method = "GET";
                 httpWebRequest.Accept = "*/*";
                 httpWebRequest.Headers.Add("Accept-Version", "3.0");
-                httpWebRequest.Headers.Add("Authorization", "Bearer d8b33418027ea3aa8d97bf2e920af8929d50130bdde73fd5512efb8db4224330");
+                httpWebRequest.Headers.Add("Authorization", "Bearer ");
 
                 var httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
 
                 using (var streamReader = new StreamReader(httpResponse.GetResponseStream()))
                 {
-                    ReverbQueryListings listings = JsonConvert.DeserializeObject<ReverbQueryListings>(streamReader.ReadToEnd());
+                    ReverbListings listings = JsonConvert.DeserializeObject<ReverbListings>(streamReader.ReadToEnd());
                     List<Listing1> liveListings = listings.listings.Where(l => l.state.description == "Live").ToList();
                     foreach(Listing1 listing in liveListings)
                     {
@@ -74,6 +81,53 @@ namespace S4CE_Watch.Helpers
                 }
             }
             return items.Count > 0 ? items : null; ;
+        }
+
+        public async Task<List<CraigslistListing>> GetCraigslist()
+        {
+            List<CraigslistListing> listings = new List<CraigslistListing>();
+            string awsEvent = JsonConvert.SerializeObject(new LambdaEvent() { amount_of_lists = "100", category = "msa", search_query = "guild songbird" });
+            HttpResponseMessage response = await RunLambda(awsEvent);
+            if (response.IsSuccessStatusCode)
+            {
+                CraigslistListings allListings = JsonConvert.DeserializeObject<CraigslistListings>(response.Content.ReadAsStringAsync().Result);
+                foreach(CraigslistListing listing in allListings.listings)
+                {
+                    listings.Add(listing);
+                }
+                return listings;
+            }
+            return null;
+        }
+
+        public async Task<HttpResponseMessage> RunLambda(string awsEvent)
+        {
+            var lambdaRequest = new InvokeRequest
+            {
+                FunctionName = "scanCraigslist",
+                Payload = awsEvent
+            };
+
+            var response = await lambdaClient.InvokeAsync(lambdaRequest);
+            if (response != null)
+            {
+                using (var sr = new StreamReader(response.Payload))
+                {
+                    string result = await sr.ReadToEndAsync();
+                    JObject jobject = JObject.Parse(result);
+                    return new HttpResponseMessage()
+                    {
+                        StatusCode = jobject["statusCode"].ToString() == "200" ? HttpStatusCode.OK : HttpStatusCode.BadRequest,
+                        Content = new StringContent(jobject["body"].ToString())
+                    };
+                }
+            }
+            return new HttpResponseMessage()
+            {
+                StatusCode = HttpStatusCode.BadRequest,
+                Content = new StringContent("")
+            }; ;
+
         }
     }
 }

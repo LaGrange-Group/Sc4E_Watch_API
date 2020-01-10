@@ -1,7 +1,7 @@
 ﻿
 using System;
 
-public class ReverbQueryListings
+public class ReverbListings
 {
     public int total { get; set; }
     public int current_page { get; set; }

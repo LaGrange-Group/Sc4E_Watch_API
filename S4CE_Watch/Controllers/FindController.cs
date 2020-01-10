@@ -27,6 +27,7 @@ namespace S4CE_Watch.Controllers
         {
             List<ListingCard> reverbListings = new List<ListingCard>();
             List<ListingCard> ebayListings = new List<ListingCard>();
+            List<ListingCard> craigslistListings = new List<ListingCard>();
             AllListings allListings = new AllListings();
             try
             {
@@ -38,9 +39,15 @@ namespace S4CE_Watch.Controllers
             }
             try
             {
-                var task = Ebay();
-                task.Wait();
-                ebayListings = task.Result;
+                ebayListings = await Ebay();
+            }
+            catch (Exception e)
+            {
+                
+            }
+            try
+            {
+                craigslistListings = await Craigslist();
             }
             catch (Exception e)
             {
@@ -58,6 +65,13 @@ namespace S4CE_Watch.Controllers
                     allListings.listings.Add(listing);
                 }
             }
+            if (craigslistListings != null && craigslistListings.Count > 0)
+            {
+                foreach (ListingCard listing in craigslistListings)
+                {
+                    allListings.listings.Add(listing);
+                }
+            }
             return Ok(allListings);
         }
 
@@ -70,18 +84,12 @@ namespace S4CE_Watch.Controllers
                 listingCards.Add(new ListingCard()
                 {
                     id = listing.id.ToString(),
-                    make = listing.make,
-                    model = listing.model,
-                    finish = listing.finish,
-                    year = listing.year,
                     title = listing.title,
-                    created_at = listing.created_at,
                     description = listing.description,
                     condition = listing.condition.display_name,
                     price = listing.price.amount,
                     published_at = listing.published_at,
-                    state = listing.state.description,
-                    photos = listing.photos.Select(p => p._links.large_crop.href).ToList(),
+                    photo = listing.photos.Select(p => p._links.large_crop.href).FirstOrDefault(),
                     listingLink = "https://reverb.com/item/" + listing.id.ToString(),
                     resourcePhoto = "reverb.png"
                 });
@@ -101,18 +109,12 @@ namespace S4CE_Watch.Controllers
                     listingCards.Add(new ListingCard()
                     {
                         id = item.ItemID,
-                        make = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Brand").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
-                        model = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
-                        finish = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Body Material").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
-                        year = item.ItemSpecifics.NameValueList.Where(n => n.Name == "Model Year").SingleOrDefault()?.Value?[0] ?? "UNKOWN",
                         title = item.Title,
-                        created_at = DateTime.Now,
-                        description = item.Description,
+                        description = item.Description.Length > 50 ? item.Description.Substring(0, 50) : item.Description,
                         condition = item.ConditionDisplayName,
                         price = item.ConvertedCurrentPrice.Value.ToString() ?? "UNKOWN",
                         published_at = DateTime.Now,
-                        state = "Live",
-                        photos = item.PictureURL.ToList(),
+                        photo = item.PictureURL.ToList().FirstOrDefault(),
                         listingLink = item.ViewItemURLForNaturalSearch,
                         resourcePhoto = "ebay.png"
                     }); ;
@@ -121,5 +123,29 @@ namespace S4CE_Watch.Controllers
             return listingCards;
         }
 
+        private async Task<List<ListingCard>> Craigslist()
+        {
+            List<ListingCard> listingCards = new List<ListingCard>();
+            List<CraigslistListing> listings = await manager.GetCraigslist();
+            if (listings != null)
+            {
+                foreach(CraigslistListing listing in listings)
+                {
+                    listingCards.Add(new ListingCard()
+                    {
+                        id = listing.id,
+                        title = listing.title,
+                        description = "",
+                        condition = "",
+                        price = listing.price,
+                        published_at = DateTime.Parse(listing.post_date),
+                        photo = listing.photo,
+                        listingLink = listing.link,
+                        resourcePhoto = "craigslist.png"
+                    });
+                }
+            }
+            return listingCards;
+        }
     }
 }
